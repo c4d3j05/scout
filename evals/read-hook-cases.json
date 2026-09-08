@@ -1,0 +1,119 @@
+{
+  "hook": "spillway-read.py",
+  "description": "Read-hook eval cases from SPEC.md §10. Placeholders in file_path are substituted by run.sh with the absolute path of a generated fixture file. Fixtures declare the exact line count to generate. BLOCK => stdout is JSON with hookSpecificOutput.permissionDecision == 'deny'. ALLOW => stdout is empty.",
+  "fixtures": {
+    "BIG": { "lines": 500, "ext": "py" },
+    "HUGE": { "lines": 1200, "ext": "py" },
+    "SMALL": { "lines": 40, "ext": "py" },
+    "EDGE_AT": { "lines": 350, "ext": "py" },
+    "EDGE_OVER": { "lines": 351, "ext": "py" },
+    "MD": { "lines": 800, "ext": "md" },
+    "SETTINGS": { "lines": 900, "ext": "py", "subdir": "settings" }
+  },
+  "cases": [
+    {
+      "name": "large-file-full-read-blocks",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{BIG}}" } },
+      "expect": "block"
+    },
+    {
+      "name": "large-file-with-limit-allows",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{BIG}}", "limit": 50 } },
+      "expect": "allow"
+    },
+    {
+      "name": "large-file-with-offset-allows",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{BIG}}", "offset": 100 } },
+      "expect": "allow"
+    },
+    {
+      "name": "large-file-with-offset-and-limit-allows",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{BIG}}", "offset": 100, "limit": 50 } },
+      "expect": "allow"
+    },
+    {
+      "name": "large-file-subagent-bypass-allows",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{BIG}}" }, "agent_type": "scout" },
+      "expect": "allow"
+    },
+    {
+      "name": "large-file-nonscout-agent-blocks",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{BIG}}" }, "agent_type": "general-purpose" },
+      "expect": "block"
+    },
+    {
+      "name": "small-file-allows",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{SMALL}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "file-exactly-at-threshold-allows",
+      "comment": "n <= MIN_LINES is allowed; 350 == 350 default threshold, so allow.",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{EDGE_AT}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "file-one-over-threshold-blocks",
+      "comment": "351 > 350 default threshold.",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{EDGE_OVER}}" } },
+      "expect": "block"
+    },
+    {
+      "name": "nonexistent-path-allows",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "/tmp/scout-does-not-exist-xyz.py" } },
+      "expect": "allow"
+    },
+    {
+      "name": "empty-file-path-allows",
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "" } },
+      "expect": "allow"
+    },
+    {
+      "name": "allow-listed-md-glob-allows",
+      "comment": "SCOUT_ALLOW_GLOBS='*.md,...' set by run.sh for this case; big .md is exempt.",
+      "env": { "SCOUT_ALLOW_GLOBS": "*.md,*/migrations/*.py,*/settings/*.py" },
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{MD}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "allow-listed-settings-glob-allows",
+      "comment": "Anchored glob '*/settings/*.py' matches an absolute path containing /settings/.",
+      "env": { "SCOUT_ALLOW_GLOBS": "*.md,*/migrations/*.py,*/settings/*.py" },
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{SETTINGS}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "non-allowlisted-big-still-blocks-with-globs-set",
+      "comment": "With globs set, a .py not matching any glob still blocks.",
+      "env": { "SCOUT_ALLOW_GLOBS": "*.md,*/migrations/*.py,*/settings/*.py" },
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{BIG}}" } },
+      "expect": "block"
+    },
+    {
+      "name": "threshold-override-via-env-allows",
+      "comment": "Raising SCOUT_MIN_LINES above the file size makes a previously-blocked file allow.",
+      "env": { "SCOUT_MIN_LINES": "9999" },
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "threshold-override-via-env-blocks-smaller",
+      "comment": "Lowering SCOUT_MIN_LINES makes a small file block.",
+      "env": { "SCOUT_MIN_LINES": "10" },
+      "payload": { "tool_name": "Read", "tool_input": { "file_path": "{{SMALL}}" } },
+      "expect": "block"
+    },
+    {
+      "name": "non-read-tool-allows",
+      "comment": "Read hook ignores tool_name != Read.",
+      "payload": { "tool_name": "Edit", "tool_input": { "file_path": "{{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "malformed-json-payload-fails-open",
+      "comment": "run.sh pipes raw (non-JSON) bytes for this case; hook must emit nothing (fail open).",
+      "raw_stdin": "this is not json {{{",
+      "expect": "allow"
+    }
+  ]
+}
