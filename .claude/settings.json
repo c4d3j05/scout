@@ -1,0 +1,19 @@
+{
+  "env": {
+    "SCOUT_MIN_LINES": "350",
+    "SCOUT_AGENT_TYPE": "scout",
+    "SCOUT_ALLOW_GLOBS": "*.md,*/migrations/*.py,*/settings/*.py"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/spillway-read.py" }]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "python3 .claude/hooks/spillway-bash.py" }]
+      }
+    ]
+  }
+}
