@@ -1,0 +1,120 @@
+{
+  "hook": "spillway-bash.py",
+  "description": "Bash-hook eval cases from SPEC.md §10. Placeholders in command are substituted by run.sh with the absolute path of a generated fixture file. BLOCK => stdout JSON with hookSpecificOutput.permissionDecision == 'deny'. ALLOW => empty stdout.",
+  "fixtures": {
+    "BIG": { "lines": 500, "ext": "py" },
+    "HUGE": { "lines": 1200, "ext": "py" },
+    "SMALL": { "lines": 40, "ext": "py" }
+  },
+  "cases": [
+    {
+      "name": "cat-big-blocks",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat {{BIG}}" } },
+      "expect": "block"
+    },
+    {
+      "name": "cat-big-subagent-bypass-allows",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat {{BIG}}" }, "agent_type": "scout" },
+      "expect": "allow"
+    },
+    {
+      "name": "cat-big-piped-to-grep-allows",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat {{BIG}} | grep x" } },
+      "expect": "allow"
+    },
+    {
+      "name": "cat-big-redirected-allows",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat {{BIG}} > /tmp/out.txt" } },
+      "expect": "allow"
+    },
+    {
+      "name": "head-n-40-big-allows",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "head -n 40 {{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "head-c-100-big-allows",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "head -c 100 {{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "head-short-form-40-big-allows",
+      "comment": "BSD/GNU short-form count -40 must be treated as targeted.",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "head -40 {{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "tail-n-40-big-allows",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "tail -n 40 {{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "head-big-no-count-blocks",
+      "comment": "head with no count flag would dump the default 10 lines but per spec a bare head/tail of a big file blocks.",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "head {{BIG}}" } },
+      "expect": "block"
+    },
+    {
+      "name": "tail-f-nonexistent-allows",
+      "comment": "tail -f log where log is not a file -> no big files -> allow. -f is not a count flag but there are no files to check.",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "tail -f /tmp/scout-nope.log" } },
+      "expect": "allow"
+    },
+    {
+      "name": "less-big-blocks",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "less {{BIG}}" } },
+      "expect": "block"
+    },
+    {
+      "name": "more-big-blocks",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "more {{BIG}}" } },
+      "expect": "block"
+    },
+    {
+      "name": "git-diff-big-allows",
+      "comment": "argv[0] git is not a reader.",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "git diff {{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "grep-big-allows",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "grep foo {{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "cat-small-allows",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat {{SMALL}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "cat-two-files-one-big-blocks",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat {{SMALL}} {{BIG}}" } },
+      "expect": "block"
+    },
+    {
+      "name": "threshold-override-via-env-allows",
+      "comment": "Raise SCOUT_MIN_LINES above file size so cat big no longer blocks.",
+      "env": { "SCOUT_MIN_LINES": "9999" },
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat {{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "cat-big-subagent-env-type-override-allows",
+      "comment": "SCOUT_AGENT_TYPE override: a differently-named worker bypasses when configured.",
+      "env": { "SCOUT_AGENT_TYPE": "reader" },
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat {{BIG}}" }, "agent_type": "reader" },
+      "expect": "allow"
+    },
+    {
+      "name": "non-bash-tool-allows",
+      "payload": { "tool_name": "Read", "tool_input": { "command": "cat {{BIG}}" } },
+      "expect": "allow"
+    },
+    {
+      "name": "unparsable-quoting-fails-open",
+      "comment": "Unbalanced quote makes shlex.split raise -> fail open (allow).",
+      "payload": { "tool_name": "Bash", "tool_input": { "command": "cat 'unterminated {{BIG}}" } },
+      "expect": "allow"
+    }
+  ]
+}
